@@ -6,14 +6,13 @@
 
 import boto3, re, sys, math, json, os, sagemaker, urllib.request
 from sagemaker import get_execution_role
-import numpy as np                                
-import pandas as pd                               
-import matplotlib.pyplot as plt                   
-from IPython.display import Image                 
-from IPython.display import display               
-from time import gmtime, strftime                 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from IPython.display import Image
+from IPython.display import display
+from time import gmtime, strftime
 from sagemaker.predictor import csv_serializer
-
 
 # Define IAM role
 role = get_execution_role()
@@ -21,10 +20,10 @@ prefix = 'sagemaker/DEMO-xgboost-dm'
 containers = {'us-west-2': '433757028032.dkr.ecr.us-west-2.amazonaws.com/xgboost:latest',
               'us-east-1': '811284229777.dkr.ecr.us-east-1.amazonaws.com/xgboost:latest',
               'us-east-2': '825641698319.dkr.ecr.us-east-2.amazonaws.com/xgboost:latest',
-              'eu-west-1': '685385470294.dkr.ecr.eu-west-1.amazonaws.com/xgboost:latest'} # each region has its XGBoost container
+              'eu-west-1': '685385470294.dkr.ecr.eu-west-1.amazonaws.com/xgboost:latest',
+              'us-west-1': '632365934929.dkr.ecr.us-west-1.amazonaws.com/xgboost:latest'} # each region has its XGBoost container
 my_region = boto3.session.Session().region_name # set the region of the instance
 print("Success - the MySageMakerInstance is in the " + my_region + " region. You will use the " + containers[my_region] + " container for your SageMaker endpoint.")
-
 
 # In[2]:
 
@@ -74,8 +73,8 @@ df = sqlContext.read.csv(SparkFiles.get("201029COVID19MEXICO.csv"), header=True,
 
 df.printSchema()
 
-#group and print the count of type of patient 
-# 1 = outpatient, 2 = inpatient 
+#group and print the count of type of patient
+# 1 = outpatient, 2 = inpatient
 df.groupBy("TIPO_PACIENTE").count().sort("count",ascending=True).show()
 
 
@@ -120,7 +119,7 @@ df1.show(5)
 
 from pyspark.sql.functions import col, when
 
-#convert the data from their format to an easier to read format 
+#convert the data from their format to an easier to read format
 
 #If yes ->1, No -> 0 and Missing/NA -> np.nan
 # df2 = df1.withColumn("PREGNANT",when(col("PREGNANT") == "2", 0).when(col("PREGNANT") == "1", 1).otherwise(np.nan))
@@ -170,7 +169,7 @@ df2.show(10);
 # In[17]:
 
 
-#Patient_type 
+#Patient_type
 #1-> Hospitalised
 #2->Home Care
 
@@ -209,8 +208,8 @@ def get_dummy(df,categoricalCols,continuousCols,labelCol):
 
     indexers = [ StringIndexer(inputCol=c, outputCol="{0}_indexed".format(c),handleInvalid="keep")
                  for c in categoricalCols ]
-    
-    #val categoryIndexerModel = new StringIndexer().setInputCol("category").setOutputCol("indexedCategory").setHandleInvalid("keep") 
+
+    #val categoryIndexerModel = new StringIndexer().setInputCol("category").setOutputCol("indexedCategory").setHandleInvalid("keep")
 
     # default setting: dropLast=True
     encoders = [ OneHotEncoder(inputCol=indexer.getOutputCol(),
@@ -246,7 +245,7 @@ df_unknown_imputed = df_unknown_imputed.withColumn("DEATH", df_unknown_imputed["
 catcols = ['SEX','NEUMONIA', 'PREGNANT','DIABETES', 'EPOC', 'ASTHMA', 'INMUSUPR','HYPERTENSION','OTHER_DISEASE',
            'CARDIOVASCULAR','OBESITY','RENAL_CRONIC','TOBACCO']
 
-#these are results from the symptoms 
+#these are results from the symptoms
 num_cols = ['DEATH', 'ICU','INTUBED']
 # num_cols = ['DEATH', 'ICU']
 #try to predict this (outpatient vs inpatient), can predict death and ICU later
@@ -277,7 +276,7 @@ featureIndexer.transform(data)
 # Split the data into training and test sets (30% held out for testing)
 (trainingData, testData) = data.randomSplit([0.7, 0.3])
 
-#breakdown of the label data that we willbe predicting 
+#breakdown of the label data that we willbe predicting
 print("Data")
 data.groupBy("label").count().sort("count",ascending=True).show()
 print("Training data")
@@ -290,7 +289,7 @@ testData.groupBy("label").count().sort("count",ascending=True).show()
 
 
 ############################################################
-#logistic regression 
+#logistic regression
 
 from pyspark.ml.classification import LogisticRegression
 logr = LogisticRegression(featuresCol='indexedFeatures', labelCol='indexedLabel')
@@ -333,9 +332,36 @@ accuracy = evaluator.evaluate(predictions)
 print("Logistic regression ML accuracy to predict inpatient vs outpatient")
 print(accuracy)
 
-
-# In[ ]:
-
+# In[12]:
 
 
+############################################################
+#random forest regression
+from pyspark.ml import Pipeline
+from pyspark.ml.regression import RandomForestRegressor
+from pyspark.ml.feature import VectorIndexer
+from pyspark.ml.evaluation import RegressionEvaluator
 
+# Train a RandomForest model.
+rf = RandomForestRegressor(featuresCol="indexedFeatures")
+
+# Chain indexer and forest in a Pipeline
+pipeline = Pipeline(stages=[featureIndexer, rf])
+
+# Train model.  This also runs the indexer.
+model = pipeline.fit(trainingData)
+
+# Make predictions.
+predictions = model.transform(testData)
+
+# Select example rows to display.
+predictions.select("prediction", "label", "features").show(5)
+
+# Select (prediction, true label) and compute test error
+evaluator = RegressionEvaluator(
+    labelCol="label", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(predictions)
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+rfModel = model.stages[1]
+print(rfModel)  # summary only
