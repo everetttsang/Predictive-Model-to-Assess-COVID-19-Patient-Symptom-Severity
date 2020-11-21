@@ -30,6 +30,7 @@ from pyspark import SparkContext
 sc = SparkContext.getOrCreate()
 
 
+
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import Row
@@ -53,24 +54,29 @@ df = pd.read_csv(SparkFiles.get("metadata.csv"), header = 0)
 df = df.drop(['sha', 'cord_uid', 'doi', 'source_x', 'pmcid', 'pubmed_id', 'source_x', 'license', 'publish_time', 'journal','who_covidence_id', 'mag_id', 'arxiv_id', 'pdf_json_files', 'pmc_json_files', 's2_id'], axis=1)
 df = df.astype({'abstract': 'string'})
 
+
+#drop all rows containing abstract="<NA>"
+df = df.dropna(subset=['abstract'])
+
+df.index.name="index"
+
 #add empty column "count"
 df["count"]=0
 
 print(df.dtypes)
 #print(df.at[0, 'abstract'])
 
-pattern = 'Mycoplasma'
-for x in range(341713):
-    count =0;
 
+pattern = 'infections'
+#print(df.index)
+for x in df.index: #341712
+    count =0;
     for match in re.finditer(pattern, df.at[x, 'abstract']):
-        print(match)
+        #print(match)
         count+= 1
         df.at[x, 'count'] = count
-
-#print(df.at[0,'abstract'])
-
-
-
+        #print(x)
+        #print(df.at[x,'abstract'])
+        #print("----- ")
 
 df
