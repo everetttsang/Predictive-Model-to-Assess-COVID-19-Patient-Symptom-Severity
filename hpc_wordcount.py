@@ -46,37 +46,77 @@ sqlContext = SQLContext(sc)
 from pyspark import SparkFiles
 
 
-abstract_metadata="https://hpcdata.s3-us-west-1.amazonaws.com/metadata.csv"
-sc.addFile(abstract_metadata)
-sqlContext = SQLContext(sc)
+# importing required modules
+from zipfile import ZipFile
 
-df = pd.read_csv(SparkFiles.get("metadata.csv"), header = 0)
-df = df.drop(['sha', 'cord_uid', 'doi', 'source_x', 'pmcid', 'pubmed_id', 'source_x', 'license', 'publish_time', 'journal','who_covidence_id', 'mag_id', 'arxiv_id', 'pdf_json_files', 'pmc_json_files', 's2_id'], axis=1)
-df = df.astype({'abstract': 'string'})
+# specifying the zip file name
+file_name = "pdf_json.zip"
+
+# opening the zip file in READ mode
+with ZipFile(file_name, 'r') as zip:
+    # printing all the contents of the zip file
+    zip.printdir()
+
+    # extracting all the files
+    print('Extracting all the files now...')
+    zip.extractall()
+    print('Done!')
+
+cd pdf_json/
+
+import json
+import pandas as pd
+from pandas.io.json import json_normalize #package for flattening json in pandas df
 
 
-#drop all rows containing abstract="<NA>"
-df = df.dropna(subset=['abstract'])
+#with open('0a00a6df208e068e7aa369fb94641434ea0e6070.json') as f:
+#        data = json.load(f)
+#data = pd.json_normalize(data)
 
-df.index.name="index"
+filenames= open('files.txt', 'r')
+Lines = filenames.readlines()
+worklist=[]
 
-#add empty column "count"
-df["count"]=0
+for line in Lines:
+    worklist.append(line.strip())
+    #print(worklist)
+#print(worklist)
+print(len(worklist))
+#print(worklist[134353])
+#print(count)
+count=0
 
-print(df.dtypes)
-#print(df.at[0, 'abstract'])
+dictionary_list = []
+#---------------------------------------------------
+#with open(worklist[0]) as l:
+#    temp = json.load(l)
+#print(temp)
+#dictionary_list.append(temp)
+#with open(worklist[1]) as m:
+#    temp = json.load(m)
+#print(temp)
+#dictionary_list.append(temp)
+#print(dictionary_list)
+#df_final = pd.DataFrame.from_dict(dictionary_list)
+#df_final
+#print(df_final.at[0, 'body_text'])
+#print(df_final.at[1, 'body_text'])
+#---------------------------------------------------
 
 
-pattern = 'infections'
-#print(df.index)
-for x in df.index: #341712
-    count =0;
-    for match in re.finditer(pattern, df.at[x, 'abstract']):
-        #print(match)
-        count+= 1
-        df.at[x, 'count'] = count
-        #print(x)
-        #print(df.at[x,'abstract'])
-        #print("----- ")
 
-df
+for item in worklist:
+    count=count+1
+    #print(count )
+    #print(item)
+    with open(item) as l:
+        temp = json.load(l)
+        dictionary_list.append(temp)
+    if len(dictionary_list)%1000==0:
+        print(len(dictionary_list))
+print("Done")
+#df_final = pd.DataFrame.from_dict(dictionary_list)
+#df_final
+    #data= data.append(temp, ignore_index=True)
+
+#data
