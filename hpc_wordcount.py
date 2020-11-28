@@ -29,8 +29,6 @@ import pyspark
 from pyspark import SparkContext
 sc = SparkContext.getOrCreate()
 
-
-
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import Row
@@ -45,7 +43,6 @@ sqlContext = SQLContext(sc)
 
 from pyspark import SparkFiles
 
-
 # importing required modules
 from zipfile import ZipFile
 
@@ -55,14 +52,53 @@ file_name = "pdf_json.zip"
 # opening the zip file in READ mode
 with ZipFile(file_name, 'r') as zip:
     # printing all the contents of the zip file
-    zip.printdir()
+    #zip.printdir()
 
     # extracting all the files
     print('Extracting all the files now...')
     zip.extractall()
     print('Done!')
 
-cd pdf_json/
+cd pdf_json
+
+#!/usr/bin/env python
+# coding: utf-8
+
+
+import json
+
+def remove_error_info(d):
+    if not isinstance(d, (dict, list)):
+        return d
+    if isinstance(d, list):
+        return [remove_error_info(v) for v in d]
+    return {k: remove_error_info(v) for k, v in d.items()
+            if k not in {'start', 'end', 'ref_end', 'ref_spans', 'cite_spans', 'bib_entries'}}
+
+
+
+
+filenames = open('files.txt', 'r')
+Lines = filenames.readlines()
+#print(Lines)
+worklist=[]
+for line in Lines:
+    worklist.append(line.strip())
+
+print(worklist)
+
+for item in worklist:
+    print("Opening: " + item)
+    with open(item) as f:
+        data = json.load(f)
+
+    data = remove_error_info(data)
+    json_string = json.dumps(data, indent = 4, sort_keys=True)
+    #print(json_string)
+
+    with open(item, 'w') as json_file:
+      json.dump(data, json_file, indent =4, sort_keys=True)
+print("Done")
 
 import json
 import pandas as pd
@@ -128,7 +164,6 @@ dictionary_list = []
 #---------------------------------------------------
 
 
-
 for x in range(4):
     for item in worklist[x]:
         count=count+1
@@ -156,13 +191,8 @@ df_final["count"]=0
 df_final["freq_pn"]= float(0)
 df_final["freq_di"]= float(0)
 
-#print(df_final.dtypes)
-
-
-
 pattern = ["pneumonia","diabetes"]
 vals = 0
-
 
 
 
@@ -172,6 +202,19 @@ for x in df_final.index: #341712
     pneumonia_count = 0;
     diabetes_count = 0;
     wordcount = 0
+
+    #search through titles in metadata
+
+    #preprossessing to clean up the text
+    abstractCurr = df_final.at[x, 'metadata']['title']
+    abstractSplit = abstractCurr.split(" ")
+    #print(abstractSplit)
+    for word in abstractSplit:
+        wordcount += 1
+        if(pattern[0] in word):
+            pneumonia_count += 1
+        if(pattern[1] in word):
+                diabetes_count += 1
 
     #search through abstract
     for y in range(len(df_final.at[x, 'abstract'])):
@@ -220,9 +263,9 @@ for x in df_final.index: #341712
                 diabetes_count += 1
 
     #search through captions to figures
-    for y in df_final.at[4, 'ref_entries']:
+    for y in df_final.at[x, 'ref_entries']:
         #preprossessing to clean up the text
-        abstractCurr = df_final.at[4, 'ref_entries'][y]['text']
+        abstractCurr = df_final.at[x, 'ref_entries'][y]['text']
         abstractSplit = abstractCurr.split(" ")
         #print(abstractSplit)
         for word in abstractSplit:
@@ -242,14 +285,11 @@ for x in df_final.index: #341712
 
 df_final
 
-
-
-
-
+#Runtime + dataparse: 10:54
 maxURL = []
 prevFreqs = []
 prevIndexes = []
-articleID = []
+articleName = []
 currFreq = 0
 maxFreq = 0
 maxIndex = 0
@@ -265,5 +305,5 @@ for i in range(0,10):
 print(prevFreqs)
 print(prevIndexes)
 for j in prevIndexes:
-    articleID.append(df_final.at[j, 'paper_id'])
-print(articleID)
+    articleName.append(df_final.at[j, 'metadata']['title'])
+print(articleName)
