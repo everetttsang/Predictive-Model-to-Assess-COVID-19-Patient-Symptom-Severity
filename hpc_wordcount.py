@@ -28,7 +28,6 @@ from pyspark.sql import SQLContext
 import pyspark
 from pyspark import SparkContext
 sc = SparkContext.getOrCreate()
-
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import Row
@@ -42,7 +41,6 @@ sc = SparkContext.getOrCreate()
 sqlContext = SQLContext(sc)
 
 from pyspark import SparkFiles
-
 # importing required modules
 from zipfile import ZipFile
 
@@ -188,34 +186,97 @@ df_final
 
 #add empty column "count"
 df_final["count"]=0
-df_final["freq_pn"]= float(0)
-df_final["freq_di"]= float(0)
+#df_final["freq_pn"]= float(0)
+#df_final["freq_di"]= float(0)
 
-pattern = ["pneumonia","diabetes"]
+df_final["pneumonia_count"]= float(0)
+df_final["diabetes_count"]= float(0)
+df_final["pregnant_count"]= float(0)
+df_final["asthma_count"]= float(0)
+df_final["copd_count"]= float(0)
+df_final["immunosuppressant_count"]= float(0)
+df_final["hypertension_count"]= float(0)
+df_final["obesity_count"]= float(0)
+df_final["ckd_count"]= float(0)
+df_final["tobacco_count"]= float(0)
+df_final["cardiovascular_count"]= float(0)
+pattern = ["pneumonia","diabetes", "pregnancy", "chronic obstructive pulomonary disease", "copd","asthma", "immunosuppressant", "hypertension","obesity","chronic kidney disease", "tobacco", "cardiovascular"]
 vals = 0
-
-
+#
+#split the value with a space, do this with every word that has a space, can do space detection for
+#keywords that we do not know yet
+pattern3_split = pattern[3].split(" ")
+pattern9_split = pattern[9].split(" ")
 
 #search through each article
 for x in df_final.index: #341712
     #keywords count to search
     pneumonia_count = 0;
     diabetes_count = 0;
+    pregnant_count = 0
+    asthma_count = 0
+    copd_count = 0
+    immunosuppressant_count = 0
+    ckd_count = 0
+    hypertension_count = 0
+    obesity_count = 0
+    tobacco_count = 0
+    cardiovascular_count = 0
+
     wordcount = 0
+
+    split3_qual = 0
+    split9_qual = 0
 
     #search through titles in metadata
 
+    ##################################################################
     #preprossessing to clean up the text
     abstractCurr = df_final.at[x, 'metadata']['title']
     abstractSplit = abstractCurr.split(" ")
-    #print(abstractSplit)
     for word in abstractSplit:
         wordcount += 1
-        if(pattern[0] in word):
+        word = word.lower() #convert to lowercase
+        word = str(word).replace('.', '') #delete periods because they would be an issue for matches
+        if(pattern[0] in word): #pneumonia
             pneumonia_count += 1
-        if(pattern[1] in word):
-                diabetes_count += 1
-
+        if(pattern[1] in word): #diabetes
+            diabetes_count += 1
+        if(pattern[2] in word): #pregnancy
+            pregnant_count += 1
+        if(word in pattern3_split): #check if the word is in a list
+            #check if the qual is made for the previous words, and if it matches the last item
+            if(split3_qual == (len(pattern3_split) - 1) and word == pattern3_split[-1]):
+                copd_count += 1
+                split3_qual = 0
+            if(pattern3_split[split3_qual] == word): #determine if the first strings match
+                split3_qual += 1
+            else:
+                split3_qual = 0 #reset if no match
+        if(pattern[4] in word): #other way to say copd
+            copd_count += 1
+        if(pattern[5] in word): #asthma
+            asthma_count += 1
+        if(pattern[6] in word): #immunosuppressant
+            immunosuppressant_count += 1
+        if(pattern[7] in word): #hypertension
+            hypertension_count += 1
+        if(pattern[8] in word): #obesity
+            obesity_count += 1
+        if(word in pattern9_split):
+            #print(word)
+            if(split9_qual == (len(pattern9_split) - 1) and word == pattern9_split[-1]):
+                ckd_count += 1
+                split9_qual = 0
+            if(pattern3_split[split9_qual] == word):
+                split9_qual += 1
+            else:
+                split9_qual = 0
+        if(pattern[10] in word): #hypertension
+            tobacco_count += 1
+        if(pattern[11] in word): #obesity
+            cardiovascular_count += 1
+    ##################################################################
     #search through abstract
     for y in range(len(df_final.at[x, 'abstract'])):
         #print(df_final.at[1, 'abstract'][y]['text'])
@@ -275,35 +336,53 @@ for x in df_final.index: #341712
             if(pattern[1] in word):
                 diabetes_count += 1
 
-    pneumonia_freq = float(pneumonia_count) / float(wordcount-pneumonia_count);
-    diabetes_freq = float(diabetes_count) / float(wordcount);
+    #pneumonia_freq = float(pneumonia_count) / float(wordcount-pneumonia_count);
+    #diabetes_freq = float(diabetes_count) / float(wordcount);
 
 #     df.at[x, 'count'] = count
-    df_final.at[x, 'freq_pn'] = pneumonia_freq
-    df_final.at[x, 'freq_di'] = diabetes_freq
+    #df_final.at[x, 'freq_pn'] = pneumonia_freq
+    #df_final.at[x, 'freq_di'] = diabetes_freq
     df_final.at[x, 'count'] = wordcount
+    df_final.at[x, 'pneumonia_count']= pneumonia_count
+    df_final.at[x, 'diabetes_count']= diabetes_count
+    df_final.at[x, 'pregnant_count']= pregnant_count
+    df_final.at[x, 'asthma_count']= asthma_count
+    df_final.at[x, 'copd_count']= copd_count
+    df_final.at[x, 'immunosuppressant_count']= immunosuppressant_count
+    df_final.at[x, 'hypertension_count']= hypertension_count
+    df_final.at[x, 'obesity_count']= obesity_count
+    df_final.at[x, 'ckd_count']= ckd_count
+    df_final.at[x, 'tobacco_count']= tobacco_count
+    df_final.at[x, 'cardiovascular_count']= cardiovascular_count
 
 df_final
 
 #Runtime + dataparse: 10:54
-maxURL = []
-prevFreqs = []
-prevIndexes = []
-articleName = []
-currFreq = 0
-maxFreq = 0
-maxIndex = 0
-for i in range(0,10):
-    for x in df_final.index: #341712
-        if(df_final.at[x,'freq_pn'] > maxFreq and prevIndexes.count(x) == 0):
-            maxFreq = df_final.at[x,'freq_pn']
-            maxIndex = x
-    prevFreqs.append(maxFreq)
-    prevIndexes.append(maxIndex)
-    maxFreq = 0
+keywordList = ['pneumonia_count', 'diabetes_count','pregnant_count','pregnant_count','asthma_count','copd_count','immunosuppressant_count','hypertension_count','obesity_count','ckd_count','tobacco_count','cardiovascular_count']
 
-print(prevFreqs)
-print(prevIndexes)
-for j in prevIndexes:
-    articleName.append(df_final.at[j, 'metadata']['title'])
-print(articleName)
+for keyword in keywordList:
+    maxURL = []
+    prevFreqs = []
+    prevIndexes = []
+    articleName = []
+    currFreq = 0
+    maxFreq = 0
+    maxIndex = 0
+    for i in range(0,10):
+        for x in df_final.index: #341712
+            if(df_final.at[x,keyword] > maxFreq and prevIndexes.count(x) == 0):
+                maxFreq = df_final.at[x,keyword]
+                maxIndex = x
+        prevFreqs.append(maxFreq)
+        prevIndexes.append(maxIndex)
+        maxFreq = 0
+
+    #print(prevFreqs)
+    #print(prevIndexes)
+    for j in prevIndexes:
+        articleName.append(df_final.at[j, 'metadata']['title'])
+
+    print('For {}: --------'.format(keyword))
+    for ten in range(len(articleName)):
+        print('[{}]: {}'.format(ten+1, articleName[ten]))
+    print('------------------')
